@@ -1,0 +1,12 @@
+# AuthShield UCI configuration
+# Defaults: 5 failures / 10s → 60s penalty; protect ports 80 and 443.
+# Optional: watch Dropbear (SSH) and ignore private/local IPs.
+
+config settings 'main'
+        option enabled           '1'
+        option threshold         '5'
+        option window            '10'
+        option penalty           '60'
+        option ports             '80 443'
+        option watch_dropbear    '0'
+        option ignore_private_ip '1'

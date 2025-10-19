@@ -1,0 +1,71 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: zh_Hans\n"
+"Project-Id-Version: luci-app-authshield 1.01\n"
+"MIME-Version: 1.0\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: luasrc/controller/authshield.lua:12
+msgid "AuthShield"
+msgstr "AuthShield 防护"
+
+#: luasrc/model/cbi/authshield.lua:6
+msgid "Lightweight intrusion prevention that delays or blocks repeated failed login attempts for both LuCI and Dropbear SSH."
+msgstr "轻量级入侵防护：对在短时间内多次登录失败的来源进行延迟或封禁，支持 LuCI 与 Dropbear SSH。"
+
+#: luasrc/model/cbi/authshield.lua:10
+msgid "General Settings"
+msgstr "常规设置"
+
+#: luasrc/model/cbi/authshield.lua:15
+msgid "Enable AuthShield"
+msgstr "启用 AuthShield"
+
+#: luasrc/model/cbi/authshield.lua:20
+msgid "Failure Threshold"
+msgstr "失败阈值"
+
+#: luasrc/model/cbi/authshield.lua:21
+msgid "Number of failed attempts within the time window before an IP is banned."
+msgstr "在统计窗口内允许的失败次数，超过即封禁该 IP。"
+
+#: luasrc/model/cbi/authshield.lua:26
+msgid "Time Window (s)"
+msgstr "统计窗口（秒）"
+
+#: luasrc/model/cbi/authshield.lua:27
+msgid "Period in seconds during which failed attempts are counted."
+msgstr "用于统计失败次数的时间窗口（单位：秒）。"
+
+#: luasrc/model/cbi/authshield.lua:32
+msgid "Ban Duration (s)"
+msgstr "封禁时长（秒）"
+
+#: luasrc/model/cbi/authshield.lua:33
+msgid "How long (in seconds) a client is banned after exceeding the threshold."
+msgstr "超过阈值后，封禁该客户端的时长（单位：秒）。"
+
+#: luasrc/model/cbi/authshield.lua:38
+msgid "Protected Ports"
+msgstr "受保护端口"
+
+#: luasrc/model/cbi/authshield.lua:39
+msgid "TCP ports to protect (space-separated). Usually 80 443 for LuCI, add others as needed."
+msgstr "需要保护的 TCP 端口（空格分隔）。LuCI 通常为 80 与 443，可按需添加。"
+
+#: luasrc/model/cbi/authshield.lua:44
+msgid "Monitor Dropbear SSH"
+msgstr "监控 Dropbear SSH"
+
+#: luasrc/model/cbi/authshield.lua:45
+msgid "Also monitor bad password attempts on Dropbear SSH service."
+msgstr "同时监控 Dropbear SSH 服务的密码错误尝试。"
+
+#: luasrc/model/cbi/authshield.lua:50
+msgid "Ignore Private IPs"
+msgstr "忽略私有 IP"
+
+#: luasrc/model/cbi/authshield.lua:51
+msgid "Skip banning LAN, loopback, and link-local addresses."
+msgstr "跳过对私有网段、回环与链路本地地址的封禁。"

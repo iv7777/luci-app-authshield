@@ -1,0 +1,164 @@
+#!/bin/ash
+#
+# AuthShield — lightweight intrusion prevention for OpenWrt
+#   Watches syslog for repeated failed logins (LuCI/rpcd, optionally Dropbear)
+#   and temporarily bans offending IPs using nftables set timeouts.
+#
+# Notes
+#   - No LuCI patching needed.
+#   - IPv4 & IPv6 supported via separate nft sets.
+#   - Private IPs (RFC1918/loopback/link-local/ULA) can be ignored.
+#
+# Environment (set by init script or overridden here)
+#   WINDOW        Sliding window in seconds to count failures (default: 10)
+#   THRESH        Failures within WINDOW needed to trigger a ban (default: 5)
+#   PENALTY       Ban duration in seconds (default: 60)
+#   WATCH_DROPBEAR 0/1 — also watch Dropbear SSH bad passwords (default: 0)
+#   IGNORE_PRIVATE 0/1 — ignore bans for private/local ranges (default: 1)
+#   SET_V4        nft set path for IPv4 (default: inet fw4 authshield_penalty_v4)
+#   SET_V6        nft set path for IPv6 (default: inet fw4 authshield_penalty_v6)
+#
+
+# ---------- Defaults ----------
+WINDOW="${WINDOW:-10}"
+THRESH="${THRESH:-5}"
+PENALTY="${PENALTY:-60}"
+WATCH_DROPBEAR="${WATCH_DROPBEAR:-0}"
+IGNORE_PRIVATE="${IGNORE_PRIVATE:-1}"
+
+# nftables set references (table/chain are prepared by the init script)
+SET_V4="${SET_V4:-inet fw4 authshield_penalty_v4}"
+SET_V6="${SET_V6:-inet fw4 authshield_penalty_v6}"
+
+# ---------- Helpers ----------
+
+# Ensure both nft sets exist (exit if firewall isn’t ready)
+ensure_sets() {
+  nft list set $SET_V4 >/dev/null 2>&1 || exit 1
+  nft list set $SET_V6 >/dev/null 2>&1 || exit 1
+}
+
+# True if $1 is a private/loopback/link-local/ULA address
+is_private_ip() {
+  case "$1" in
+    10.* | 192.168.* | 172.1[6-9].* | 172.2[0-9].* | 172.3[0-1].*   | 127.* | ::1 | fe80:* | fd* | fc*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+# Add IP to the nft set with timeout = PENALTY
+ban_ip() {
+  local ip="$1"
+
+  # Optionally skip private/local addresses
+  if [ "$IGNORE_PRIVATE" = "1" ] && is_private_ip "$ip"; then
+    return 0
+  fi
+
+  case "$ip" in
+    *:*) nft add element $SET_V6 "{ $ip timeout ${PENALTY}s }" 2>/dev/null ;; # IPv6
+    *)   nft add element $SET_V4 "{ $ip timeout ${PENALTY}s }" 2>/dev/null ;; # IPv4
+  esac
+  
+  # --- Log to syslog ---
+  logger -t authshield "Banned IP $ip for ${PENALTY}s (threshold $THRESH within ${WINDOW}s)"
+}
+
+# Stream failed login events from syslog and print only the offending IPs (one per line)
+stream_failures() {
+  # Keep logread -f on the left so awk sees a continuous stream.
+  logread -f | awk -v watchdb="$WATCH_DROPBEAR" '
+    # Emit the cleaned IP to stdout
+    function emit_ip(ip) {
+      gsub(/[,;]$/, "", ip)      # strip trailing punctuation
+      sub(/:[0-9]+$/, "", ip)    # strip trailing :port
+      if (ip != "") { print ip; fflush() }
+    }
+
+    # Scan fields and return the last token that looks like an IP(v4 or v6)
+    function last_ip_like(   i, tok, ip) {
+      ip = ""
+      for (i = 1; i <= NF; i++) {
+        tok = $i
+        gsub(/^[\[\(]+|[\]\)]+$/, "", tok)   # strip [ ( and ) ]
+        if (tok ~ /^([0-9]{1,3}\.){3}[0-9]{1,3}(:[0-9]+)?[,;]?$/) {
+          ip = tok
+        } else if (tok ~ /^[0-9a-fA-F:]+(%[0-9A-Za-z._-]+)?(:[0-9]+)?[,;]?$/) {
+          ip = tok
+        }
+      }
+      return ip
+    }
+
+    {
+      line = $0
+
+      # LuCI / rpcd / uhttpd failed login lines (case-insensitive on "login")
+      if (line ~ /(luci|rpcd|uhttpd)/ && line ~ /(fail|failed|bad)/ && line ~ /login/i) {
+        ip = last_ip_like()
+        if (ip != "") emit_ip(ip)
+        next
+      }
+
+      # Dropbear "Bad password" (enabled when watchdb=1)
+      if (watchdb == "1" && line ~ /dropbear/ && line ~ /(Bad|bad).*password/) {
+        ip = last_ip_like()
+        if (ip != "") emit_ip(ip)
+        next
+      }
+    }
+  '
+}
+
+# Sliding-window counter:
+#   - reads IPs (one per line) on stdin
+#   - bans IP once it has THRESH events within WINDOW seconds
+monitor_and_ban() {
+  awk -v WIN="$WINDOW" -v TH="$THRESH" '
+    function now() { return systime() }
+
+    # Append timestamp to IPs ring (T[ip_idx]) and maintain count N[ip]
+    function push(ts, ip) { N[ip]++; T[ip "_" N[ip]] = ts }
+
+    # Drop entries older than WIN seconds for this IP
+    function prune(ts, ip,   n, m, i, t) {
+      n = N[ip]; m = 0
+      for (i = 1; i <= n; i++) {
+        t = T[ip "_" i]
+        if (ts - t <= WIN) { m++; T[ip "_" m] = t }
+      }
+      N[ip] = m
+    }
+
+    # Main stream processing
+    {
+      ip = $0
+      t  = now()
+      prune(t, ip)
+      push(t, ip)
+
+      if (N[ip] >= TH) {
+        print "BAN " ip
+        N[ip] = 0   # reset after ban trigger
+        fflush()
+      }
+    }
+  '
+}
+
+# ---------- Main ----------
+main() {
+  ensure_sets || { echo "authshield: nft sets missing" >&2; exit 1; }
+
+  # Pipeline:
+  #   [ logread -f → awk (IPs) ] | [ awk sliding window ] | [ shell loop → ban_ip ]
+  stream_failures     | monitor_and_ban     | while read -r action ip; do
+        [ "$action" = "BAN" ] && ban_ip "$ip"
+      done
+}
+
+main
