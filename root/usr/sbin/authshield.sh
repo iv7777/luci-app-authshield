@@ -1,4 +1,4 @@
-#!/bin/ash
+#!/bin/sh
 #
 # AuthShield — lightweight intrusion prevention for OpenWrt
 #   Watches syslog for repeated failed logins (LuCI/rpcd, optionally Dropbear)
@@ -10,6 +10,13 @@
 #   - Private IPs (RFC1918/loopback/link-local/ULA) can be ignored.
 #
 # Environment (set by init script or overridden here)
+# Escalation switch and params
+ESCALATE_ENABLE="${ESCALATE_ENABLE:-1}"
+ESCALATE_THRESHOLD="${ESCALATE_THRESHOLD:-5}"
+ESCALATE_WINDOW="${ESCALATE_WINDOW:-3600}"
+ESCALATE_PENALTY="${ESCALATE_PENALTY:-86400}"
+BAN_TRACK_FILE="${BAN_TRACK_FILE:-/var/run/authshield.bans}"
+
 #   WINDOW        Sliding window in seconds to count failures (default: 10)
 #   THRESH        Failures within WINDOW needed to trigger a ban (default: 5)
 #   PENALTY       Ban duration in seconds (default: 60)
@@ -59,14 +66,26 @@ ban_ip() {
     return 0
   fi
 
+  # Decide penalty (escalation can be toggled off via UI)
+  local dur
+  if [ "$ESCALATE_ENABLE" = "1" ]; then
+    dur="$(record_and_get_penalty "$ip" 2>/dev/null)" || dur="$PENALTY"
+  else
+    dur="$PENALTY"
+  fi
+
   case "$ip" in
-    *:*) nft add element $SET_V6 "{ $ip timeout ${PENALTY}s }" 2>/dev/null ;; # IPv6
-    *)   nft add element $SET_V4 "{ $ip timeout ${PENALTY}s }" 2>/dev/null ;; # IPv4
+    *:*) nft add element $SET_V6 "{ $ip timeout ${dur}s }" 2>/dev/null ;; # IPv6
+    *)   nft add element $SET_V4 "{ $ip timeout ${dur}s }" 2>/dev/null ;; # IPv4
   esac
-  
-  # --- Log to syslog ---
-  logger -t authshield "Banned IP $ip for ${PENALTY}s (threshold $THRESH within ${WINDOW}s)"
+
+  if [ "$ESCALATE_ENABLE" = "1" ] && [ "$dur" -ge "$ESCALATE_PENALTY" ]; then
+    logger -t authshield "Escalated ban: $ip for ${dur}s (> ${ESCALATE_THRESHOLD} bans within ${ESCALATE_WINDOW}s)"
+  else
+    logger -t authshield "Banned IP $ip for ${dur}s (threshold $THRESH within ${WINDOW}s)"
+  fi
 }
+
 
 # Stream failed login events from syslog and print only the offending IPs (one per line)
 stream_failures() {
@@ -150,6 +169,32 @@ monitor_and_ban() {
   '
 }
 
+
+# Record the ban for $ip, prune old records, and return the effective penalty (seconds)
+record_and_get_penalty() {
+  local ip="$1"
+  local now cutoff tmp count
+  now="$(date +%s)"
+  cutoff=$(( now - ESCALATE_WINDOW ))
+  tmp="/var/run/authshield.bans.$$"
+
+  mkdir -p /var/run
+  : > "$BAN_TRACK_FILE" 2>/dev/null || true
+
+  count="$(awk -v cutoff="$cutoff" -v ip="$ip" -v out="$tmp" '
+    $1 >= cutoff { print > out; if ($2 == ip) c++ }
+    END { print (c ? c : 0) }
+  ' "$BAN_TRACK_FILE")"
+
+  mv -f "$tmp" "$BAN_TRACK_FILE" 2>/dev/null || true
+  printf "%s %s\n" "$now" "$ip" >> "$BAN_TRACK_FILE"
+
+  if [ $(( count + 1 )) -gt "$ESCALATE_THRESHOLD" ]; then
+    printf "%s\n" "$ESCALATE_PENALTY"
+  else
+    printf "%s\n" "$PENALTY"
+  fi
+}
 # ---------- Main ----------
 main() {
   ensure_sets || { echo "authshield: nft sets missing" >&2; exit 1; }

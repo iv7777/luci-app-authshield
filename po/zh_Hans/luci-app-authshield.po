@@ -69,3 +69,21 @@ msgstr "忽略私有 IP"
 #: luasrc/model/cbi/authshield.lua:51
 msgid "Skip banning LAN, loopback, and link-local addresses."
 msgstr "跳过对私有网段、回环与链路本地地址的封禁。"
+
+msgid "Escalate frequent offenders"
+msgstr "升级惩罚（频繁违规）"
+
+msgid "If an IP is banned more than 5 times within 1 hour, ban it for 24 hours."
+msgstr "若同一 IP 在 1 小时内被封禁超过 5 次，则封禁 24 小时。"
+
+msgid "Currently Banned IPs"
+msgstr "当前被封禁的 IP"
+
+msgid "None"
+msgstr "无"
+
+msgid "IP"
+msgstr "IP 地址"
+
+msgid "Expires"
+msgstr "到期时间"
