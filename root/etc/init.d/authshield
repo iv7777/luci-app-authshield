@@ -157,12 +157,12 @@ start_service() {
     escalate_enable="$(get_uciv authshield.@settings[0].escalate_enable)"; [ -n "$escalate_enable" ] || escalate_enable=1
 
     # --- Add port 22 when Dropbear monitoring is enabled ---
-if [ "$watch_dropbear" = "1" ]; then
-    case " $ports " in
-        *" 22 "*) : ;;  # already has it
-        *) ports="$ports 22" ;;
-    esac
-fi
+    if [ "$watch_dropbear" = "1" ]; then
+        case " $ports " in
+            *" 22 "*) : ;;  # already has it
+            *) ports="$ports 22" ;;
+        esac
+    fi
 
     [ "$enabled" -eq 1 ] || return 0
 

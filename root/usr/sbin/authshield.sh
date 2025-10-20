@@ -10,13 +10,6 @@
 #   - Private IPs (RFC1918/loopback/link-local/ULA) can be ignored.
 #
 # Environment (set by init script or overridden here)
-# Escalation switch and params
-ESCALATE_ENABLE="${ESCALATE_ENABLE:-1}"
-ESCALATE_THRESHOLD="${ESCALATE_THRESHOLD:-5}"
-ESCALATE_WINDOW="${ESCALATE_WINDOW:-3600}"
-ESCALATE_PENALTY="${ESCALATE_PENALTY:-86400}"
-BAN_TRACK_FILE="${BAN_TRACK_FILE:-/var/run/authshield.bans}"
-
 #   WINDOW        Sliding window in seconds to count failures (default: 10)
 #   THRESH        Failures within WINDOW needed to trigger a ban (default: 5)
 #   PENALTY       Ban duration in seconds (default: 60)
@@ -36,6 +29,13 @@ IGNORE_PRIVATE="${IGNORE_PRIVATE:-1}"
 # nftables set references (table/chain are prepared by the init script)
 SET_V4="${SET_V4:-inet fw4 authshield_penalty_v4}"
 SET_V6="${SET_V6:-inet fw4 authshield_penalty_v6}"
+
+# Escalation switch and params
+ESCALATE_ENABLE="${ESCALATE_ENABLE:-1}"
+ESCALATE_THRESHOLD="${ESCALATE_THRESHOLD:-5}"
+ESCALATE_WINDOW="${ESCALATE_WINDOW:-3600}"
+ESCALATE_PENALTY="${ESCALATE_PENALTY:-86400}"
+BAN_TRACK_FILE="${BAN_TRACK_FILE:-/var/run/authshield.bans}"
 
 # ---------- Helpers ----------
 
