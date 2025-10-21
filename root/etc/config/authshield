@@ -3,7 +3,7 @@
 # Optional: watch Dropbear (SSH) and ignore private/local IPs.
 
 config settings 'main'
-        option enabled           '1'
+        option enabled           '0'
         option threshold         '5'
         option window            '10'
         option penalty           '60'
