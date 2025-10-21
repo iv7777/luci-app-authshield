@@ -179,7 +179,7 @@ record_and_get_penalty() {
   tmp="/var/run/authshield.bans.$$"
 
   mkdir -p /var/run
-  : > "$BAN_TRACK_FILE" 2>/dev/null || true
+  touch "$BAN_TRACK_FILE"
 
   count="$(awk -v cutoff="$cutoff" -v ip="$ip" -v out="$tmp" '
     $1 >= cutoff { print > out; if ($2 == ip) c++ }
@@ -195,6 +195,7 @@ record_and_get_penalty() {
     printf "%s\n" "$PENALTY"
   fi
 }
+
 # ---------- Main ----------
 main() {
   ensure_sets || { echo "authshield: nft sets missing" >&2; exit 1; }
