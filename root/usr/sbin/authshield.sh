@@ -11,7 +11,7 @@
 #
 # Environment (set by init script or overridden here)
 #   WINDOW        Sliding window in seconds to count failures (default: 10)
-#   THRESH        Failures within WINDOW needed to trigger a ban (default: 5)
+#   THRESHOLD     Failures within WINDOW needed to trigger a ban (default: 5)
 #   PENALTY       Ban duration in seconds (default: 60)
 #   WATCH_DROPBEAR 0/1 — also watch Dropbear SSH bad passwords (default: 0)
 #   IGNORE_PRIVATE 0/1 — ignore bans for private/local ranges (default: 1)
@@ -21,7 +21,7 @@
 
 # ---------- Defaults ----------
 WINDOW="${WINDOW:-10}"
-THRESH="${THRESH:-5}"
+THRESHOLD="${THRESHOLD:-5}"
 PENALTY="${PENALTY:-60}"
 WATCH_DROPBEAR="${WATCH_DROPBEAR:-0}"
 IGNORE_PRIVATE="${IGNORE_PRIVATE:-1}"
@@ -82,7 +82,7 @@ ban_ip() {
   if [ "$ESCALATE_ENABLE" = "1" ] && [ "$dur" -ge "$ESCALATE_PENALTY" ]; then
     logger -t authshield "Escalated ban: $ip for ${dur}s (> ${ESCALATE_THRESHOLD} bans within ${ESCALATE_WINDOW}s)"
   else
-    logger -t authshield "Banned IP $ip for ${dur}s (threshold $THRESH within ${WINDOW}s)"
+    logger -t authshield "Banned IP $ip for ${dur}s (threshold $THRESHOLD within ${WINDOW}s)"
   fi
 }
 
@@ -135,9 +135,9 @@ stream_failures() {
 
 # Sliding-window counter:
 #   - reads IPs (one per line) on stdin
-#   - bans IP once it has THRESH events within WINDOW seconds
+#   - bans IP once it has THRESHOLD events within WINDOW seconds
 monitor_and_ban() {
-  awk -v WIN="$WINDOW" -v TH="$THRESH" '
+  awk -v WIN="$WINDOW" -v TH="$THRESHOLD" '
     function now() { return systime() }
 
     # Append timestamp to IPs ring (T[ip_idx]) and maintain count N[ip]

@@ -171,13 +171,13 @@ start_service() {
     procd_set_param respawn 5 10 5           # (timeout, retry, max)
     procd_set_param stdout 1
     procd_set_param stderr 1
-    procd_set_param env THRESHOLD="$threshold"
-    procd_set_param env WINDOW="$window"
-    procd_set_param env PENALTY="$penalty"
-    procd_set_param env PORTS="$ports"
-    procd_set_param env WATCH_DROPBEAR="$watch_dropbear"
-    procd_set_param env IGNORE_PRIVATE="$ignore_private"
-    procd_set_param env ESCALATE_ENABLE="$escalate_enable"
+    procd_set_param env THRESHOLD="$threshold" \
+                        WINDOW="$window" \
+                        PENALTY="$penalty" \
+                        PORTS="$ports" \
+                        WATCH_DROPBEAR="$watch_dropbear" \
+                        IGNORE_PRIVATE="$ignore_private" \
+                        ESCALATE_ENABLE="$escalate_enable"
     procd_close_instance
 }
 
