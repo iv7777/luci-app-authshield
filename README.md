@@ -2,7 +2,7 @@
 
 **Multi-service login intrusion prevention for OpenWrt (LuCI + Dropbear)**  
 Author: **iv7777 <hongba@rocketmail.com>**  
-Version: **1.02**  
+Version: **1.03**  
 Date: **2025-10-20**  
 License: **MIT**
 
