@@ -88,7 +88,7 @@ do
                 for _, e in ipairs(item.set.elem) do
                     if type(e) == "table" then
                         local ip = (type(e.elem) == "table" and (e.elem.val or e.elem[1])) or e.elem or e.val or e[1]
-                        local rem = e.expires or e.timeout or (type(e.elem) == "table" and e.elem.timeout)
+                        local rem = e.expires or e.timeout or (type(e.elem) == "table" and e.elem.expires)
                         if ip then table.insert(list, { ip = tostring(ip), rem = tonumber(rem) }) end
                     elseif type(e) == "string" then
                         table.insert(list, { ip = e, rem = nil })
