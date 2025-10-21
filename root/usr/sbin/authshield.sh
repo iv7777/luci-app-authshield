@@ -123,12 +123,14 @@ stream_failures() {
         next
       }
 
-      # Dropbear "Bad password" (enabled when watchdb=1)
-      if (watchdb == "1" && line ~ /dropbear/ && line ~ /(Bad|bad).*password/) {
+      # Dropbear (enabled when watchdb=1)
+      # Match both "Bad password" and "Login attempt for nonexistent user"
+      if (watchdb == "1" && line ~ /dropbear/ && (line ~ /(Bad|bad).*password/ || line ~ /[Ll]ogin attempt for nonexistent user/)) {
         ip = last_ip_like()
         if (ip != "") emit_ip(ip)
         next
       }
+
     }
   '
 }
