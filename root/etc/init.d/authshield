@@ -121,12 +121,8 @@ if ! nft list table inet fw4 >/dev/null 2>&1; then
   nft add table inet fw4
 fi
 
-# Remove any old rules we inserted in 'input'
+# Remove any old rules we inserted in 'input' to avoid duplication
 del_old_rules input || true
-
-# Recreate penalty sets (delete then add, no "replace set")
-nft delete set inet fw4 "\$SET_V4" >/dev/null 2>&1 || true
-nft delete set inet fw4 "\$SET_V6" >/dev/null 2>&1 || true
 
 # Add sets with pure nft syntax (no shell redirects inside)
 nft -f - <<NFE
