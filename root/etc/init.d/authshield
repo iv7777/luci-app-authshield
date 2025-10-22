@@ -171,12 +171,16 @@ del_old_rules() {
 # ---- procd lifecycle ----
 
 start_service() {
+    local enabled threshold window penalty ports watch_dropbear ignore_private escalate_enable
+
+    # Only when enabled do we continue
+    enabled="$(get_uciv authshield.@settings[0].enabled)"; [ -n "$enabled" ] || enabled=1
+    [ "$enabled" -eq 1 ] || return 0
+
     # Generate/refresh nftables include & reload firewall
     regen_rules_and_reload_fw
 
     # Read watcher env from UCI (@settings[0] consistently)
-    local enabled threshold window penalty ports watch_dropbear ignore_private escalate_enable
-    enabled="$(get_uciv authshield.@settings[0].enabled)";           [ -n "$enabled" ] || enabled=1
     threshold="$(get_uciv authshield.@settings[0].threshold)";       [ -n "$threshold" ] || threshold=5
     window="$(get_uciv authshield.@settings[0].window)";             [ -n "$window" ] || window=10
     penalty="$(get_uciv authshield.@settings[0].penalty)";           [ -n "$penalty" ] || penalty=60
@@ -206,11 +210,14 @@ start_service() {
 
 stop_service() {
     # procd will stop our instance; we just clean up stragglers
-    kill_leftovers
-    # remove firewall include file
-    rm -f "$FW_INCLUDE"
+    kill_leftovers || true
+
+    # remove the firewall include file only if it exists
+    [ -f "$FW_INCLUDE" ] && rm -f "$FW_INCLUDE"
+
     # Remove any old rules we inserted in 'input'
     del_old_rules input || true
+
     # delete all the sets we created
     nft delete set inet fw4 "$SET_V4" 2>/dev/null || true
     nft delete set inet fw4 "$SET_V6" 2>/dev/null || true
@@ -223,8 +230,8 @@ reload_service() {
 }
 
 service_triggers() {
-    # Reload our service when authshield UCI changes; also when firewall changes.
-    procd_add_reload_trigger "authshield" "firewall"
+    # Reload our service when authshield UCI changes
+    procd_add_reload_trigger "authshield"
 }
 
 # Convenience handler for rc.common `restart`
