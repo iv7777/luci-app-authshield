@@ -1,4 +1,4 @@
-#!/bin/sh /etc/rc.common
+#!/bin/sh /etc/rc.common 
 # AuthShield init (procd)
 # Enforces bans for LuCI/Dropbear by dropping at top of input_lan/input_wan.
 # Generates /var/run/authshield.nft as a *script* include for fw4.
@@ -10,6 +10,8 @@ NAME=authshield
 
 WATCH_BIN="/usr/sbin/authshield.sh"
 FW_INCLUDE="/var/run/authshield.nft"
+SET_V4="authshield_penalty_v4"
+SET_V6="authshield_penalty_v6"
 
 # ---- helpers ----
 
@@ -101,12 +103,14 @@ set -eu
 
 PORTS_CSV="$ports_csv"
 PENALTY="$penalty"
+SET_V4="$SET_V4"
+SET_V6="$SET_V6"
 
-# Delete our previous rules (by handle) to avoid duplication
+# Delete previous rules
 del_old_rules() {
   local chain="\$1"
   nft -a list chain inet fw4 "\$chain" 2>/dev/null | \
-    awk '/@authshield_penalty_v[46]/ && / dport / {print \$NF}' | \
+    awk '/@'\$SET_V4'/ || /@'\$SET_V6'/ && / dport / {print \$NF}' | \
     tr -d ';' | while read -r h; do
       [ -n "\$h" ] && nft delete rule inet fw4 "\$chain" handle "\$h" 2>/dev/null || true
     done
@@ -117,26 +121,22 @@ if ! nft list table inet fw4 >/dev/null 2>&1; then
   nft add table inet fw4
 fi
 
+# Remove any old rules we inserted in 'input'
+del_old_rules input || true
+
 # Recreate penalty sets (delete then add, no "replace set")
-nft delete set inet fw4 authshield_penalty_v4 >/dev/null 2>&1 || true
-nft delete set inet fw4 authshield_penalty_v6 >/dev/null 2>&1 || true
+nft delete set inet fw4 "\$SET_V4" >/dev/null 2>&1 || true
+nft delete set inet fw4 "\$SET_V6" >/dev/null 2>&1 || true
 
 # Add sets with pure nft syntax (no shell redirects inside)
 nft -f - <<NFE
-add set inet fw4 authshield_penalty_v4 { type ipv4_addr; flags timeout; timeout \${PENALTY}s; }
-add set inet fw4 authshield_penalty_v6 { type ipv6_addr; flags timeout; timeout \${PENALTY}s; }
+add set inet fw4 \$SET_V4 { type ipv4_addr; flags timeout; timeout \${PENALTY}s; }
+add set inet fw4 \$SET_V6 { type ipv6_addr; flags timeout; timeout \${PENALTY}s; }
 NFE
 
-# Remove any older insertions we made
-del_old_rules input_lan || true
-del_old_rules input_wan || true
-
-# Also remove any prior early-drop we inserted in 'input' (idempotent)
-del_old_rules input || true
-
 # Insert the early-drop rules BEFORE conntrack established/related accept
-nft insert rule inet fw4 input index 1 tcp dport {\${PORTS_CSV}} ip  saddr @authshield_penalty_v4 counter drop 2>/dev/null || true
-nft insert rule inet fw4 input index 1 tcp dport {\${PORTS_CSV}} ip6 saddr @authshield_penalty_v6 counter drop 2>/dev/null || true
+nft insert rule inet fw4 input index 1 tcp dport {\${PORTS_CSV}} ip  saddr @\${SET_V4} counter drop 2>/dev/null || true
+nft insert rule inet fw4 input index 1 tcp dport {\${PORTS_CSV}} ip6 saddr @\${SET_V6} counter drop 2>/dev/null || true
 
 exit 0
 EOF
@@ -158,6 +158,14 @@ kill_leftovers() {
     sleep 1
     pids="$(pgrep -f "$WATCH_BIN" 2>/dev/null || true)"
     [ -z "$pids" ] || kill -9 $pids 2>/dev/null || true
+}
+
+# Delete previous rules
+del_old_rules() {
+  local chain="$1"
+  nft -a list chain inet fw4 "$chain" 2>/dev/null |     awk '/@'$SET_V4'/ || /@'$SET_V6'/ && / dport / {print $NF}' |     tr -d ';' | while read -r h; do
+      [ -n "$h" ] && nft delete rule inet fw4 "$chain" handle "$h" 2>/dev/null || true
+    done
 }
 
 # ---- procd lifecycle ----
@@ -190,13 +198,22 @@ start_service() {
                         PORTS="$ports" \
                         WATCH_DROPBEAR="$watch_dropbear" \
                         IGNORE_PRIVATE="$ignore_private" \
-                        ESCALATE_ENABLE="$escalate_enable"
+                        ESCALATE_ENABLE="$escalate_enable" \
+                        SET_V4="$SET_V4" \
+                        SET_V6="$SET_V6"
     procd_close_instance
 }
 
 stop_service() {
     # procd will stop our instance; we just clean up stragglers
     kill_leftovers
+    # remove firewall include file
+    rm -f "$FW_INCLUDE"
+    # Remove any old rules we inserted in 'input'
+    del_old_rules input || true
+    # delete all the sets we created
+    nft delete set inet fw4 "$SET_V4" 2>/dev/null || true
+    nft delete set inet fw4 "$SET_V6" 2>/dev/null || true
 }
 
 reload_service() {

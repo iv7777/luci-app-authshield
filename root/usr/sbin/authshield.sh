@@ -15,8 +15,8 @@
 #   PENALTY       Ban duration in seconds (default: 60)
 #   WATCH_DROPBEAR 0/1 — also watch Dropbear SSH bad passwords (default: 0)
 #   IGNORE_PRIVATE 0/1 — ignore bans for private/local ranges (default: 1)
-#   SET_V4        nft set path for IPv4 (default: inet fw4 authshield_penalty_v4)
-#   SET_V6        nft set path for IPv6 (default: inet fw4 authshield_penalty_v6)
+#   SET_V4_PATH    nft set path for IPv4 (default: inet fw4 authshield_penalty_v4)
+#   SET_V6_PATH    nft set path for IPv6 (default: inet fw4 authshield_penalty_v6)
 #
 
 # ---------- Defaults ----------
@@ -27,8 +27,11 @@ WATCH_DROPBEAR="${WATCH_DROPBEAR:-0}"
 IGNORE_PRIVATE="${IGNORE_PRIVATE:-1}"
 
 # nftables set references (table/chain are prepared by the init script)
-SET_V4="${SET_V4:-inet fw4 authshield_penalty_v4}"
-SET_V6="${SET_V6:-inet fw4 authshield_penalty_v6}"
+SET_V4="${SET_V4:-authshield_penalty_v4}"
+SET_V6="${SET_V6:-authshield_penalty_v6}"
+# make nft set path
+SET_V4_PATH="inet fw4 $SET_V4"
+SET_V6_PATH="inet fw4 $SET_V6"
 
 # Escalation switch and params
 ESCALATE_ENABLE="${ESCALATE_ENABLE:-1}"
@@ -41,8 +44,8 @@ BAN_TRACK_FILE="${BAN_TRACK_FILE:-/var/run/authshield.bans}"
 
 # Ensure both nft sets exist (exit if firewall isn’t ready)
 ensure_sets() {
-  nft list set $SET_V4 >/dev/null 2>&1 || exit 1
-  nft list set $SET_V6 >/dev/null 2>&1 || exit 1
+  nft list set $SET_V4_PATH >/dev/null 2>&1 || exit 1
+  nft list set $SET_V6_PATH >/dev/null 2>&1 || exit 1
 }
 
 # True if $1 is a private/loopback/link-local/ULA address
@@ -75,8 +78,8 @@ ban_ip() {
   fi
 
   case "$ip" in
-    *:*) nft add element $SET_V6 "{ $ip timeout ${dur}s }" 2>/dev/null ;; # IPv6
-    *)   nft add element $SET_V4 "{ $ip timeout ${dur}s }" 2>/dev/null ;; # IPv4
+    *:*) nft add element $SET_V6_PATH "{ $ip timeout ${dur}s }" 2>/dev/null ;; # IPv6
+    *)   nft add element $SET_V4_PATH "{ $ip timeout ${dur}s }" 2>/dev/null ;; # IPv4
   esac
 
   if [ "$ESCALATE_ENABLE" = "1" ] && [ "$dur" -ge "$ESCALATE_PENALTY" ]; then
