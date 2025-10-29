@@ -10,6 +10,7 @@ NAME=authshield
 
 WATCH_BIN="/usr/sbin/authshield.sh"
 FW_INCLUDE="/var/run/authshield.nft"
+BAN_TRACK_FILE="/var/run/authshield.bans" # File storing ban history
 SET_V4="authshield_penalty_v4"
 SET_V6="authshield_penalty_v6"
 
@@ -209,6 +210,7 @@ start_service() {
                         ESCALATE_THRESHOLD="$escalate_threshold" \
                         ESCALATE_WINDOW="$escalate_window" \
                         ESCALATE_PENALTY="$escalate_penalty" \
+                        BAN_TRACK_FILE="$BAN_TRACK_FILE" \
                         GLOBAL_ENABLE="$global_enable" \
                         GLOBAL_THRESHOLD="$global_threshold" \
                         GLOBAL_WINDOW="$global_window" \
@@ -224,6 +226,9 @@ stop_service() {
 
     # remove the firewall include file only if it exists
     [ -f "$FW_INCLUDE" ] && rm -f "$FW_INCLUDE"
+
+    # remove the BAN_TRACK_FILE only if it exists
+    [ -f "$BAN_TRACK_FILE" ] && rm -f "$BAN_TRACK_FILE"
 
     # Remove any old rules we inserted in 'input'
     del_old_rules input || true
