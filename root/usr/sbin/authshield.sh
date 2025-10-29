@@ -9,36 +9,34 @@
 #   - IPv4 & IPv6 supported via separate nft sets.
 #   - Private IPs (RFC1918/loopback/link-local/ULA) can be ignored.
 #
-# Environment (set by init script or overridden here)
-#   WINDOW        Sliding window in seconds to count failures (default: 10)
-#   THRESHOLD     Failures within WINDOW needed to trigger a ban (default: 5)
-#   PENALTY       Ban duration in seconds (default: 60)
-#   WATCH_DROPBEAR 0/1 — also watch Dropbear SSH bad passwords (default: 0)
-#   IGNORE_PRIVATE 0/1 — ignore bans for private/local ranges (default: 1)
-#   SET_V4_PATH    nft set path for IPv4 (default: inet fw4 authshield_penalty_v4)
-#   SET_V6_PATH    nft set path for IPv6 (default: inet fw4 authshield_penalty_v6)
-#
 
 # ---------- Defaults ----------
-WINDOW="${WINDOW:-10}"
-THRESHOLD="${THRESHOLD:-5}"
-PENALTY="${PENALTY:-60}"
-WATCH_DROPBEAR="${WATCH_DROPBEAR:-0}"
-IGNORE_PRIVATE="${IGNORE_PRIVATE:-1}"
+
+WINDOW="${WINDOW:-10}"               # Sliding window in seconds for counting failed logins
+THRESHOLD="${THRESHOLD:-5}"          # Number of failures within WINDOW before a ban
+PENALTY="${PENALTY:-60}"             # Ban duration in seconds
+WATCH_DROPBEAR="${WATCH_DROPBEAR:-0}" # Monitor Dropbear SSH bad passwords (1 = enable)
+
+# Global (long-window) rule defaults
+GLOBAL_ENABLE="${GLOBAL_ENABLE:-1}"      # Enable long-term global ban tracking
+GLOBAL_THRESHOLD="${GLOBAL_THRESHOLD:-60}" # Failures allowed in long-term window
+GLOBAL_WINDOW="${GLOBAL_WINDOW:-43200}"    # Long-term window in seconds (12h)
+GLOBAL_PENALTY="${GLOBAL_PENALTY:-86400}"  # 24-hour ban duration for global threshold
+
+IGNORE_PRIVATE="${IGNORE_PRIVATE:-1}"      # Ignore local/private IP addresses
 
 # nftables set references (table/chain are prepared by the init script)
-SET_V4="${SET_V4:-authshield_penalty_v4}"
-SET_V6="${SET_V6:-authshield_penalty_v6}"
-# make nft set path
-SET_V4_PATH="inet fw4 $SET_V4"
-SET_V6_PATH="inet fw4 $SET_V6"
+SET_V4="${SET_V4:-authshield_penalty_v4}"  # IPv4 penalty set name
+SET_V6="${SET_V6:-authshield_penalty_v6}"  # IPv6 penalty set name
+SET_V4_PATH="inet fw4 $SET_V4"             # Full path for IPv4 set
+SET_V6_PATH="inet fw4 $SET_V6"             # Full path for IPv6 set
 
 # Escalation switch and params
-ESCALATE_ENABLE="${ESCALATE_ENABLE:-1}"
-ESCALATE_THRESHOLD="${ESCALATE_THRESHOLD:-5}"
-ESCALATE_WINDOW="${ESCALATE_WINDOW:-3600}"
-ESCALATE_PENALTY="${ESCALATE_PENALTY:-86400}"
-BAN_TRACK_FILE="${BAN_TRACK_FILE:-/var/run/authshield.bans}"
+ESCALATE_ENABLE="${ESCALATE_ENABLE:-1}"       # Enable escalation tracking (1 = on)
+ESCALATE_THRESHOLD="${ESCALATE_THRESHOLD:-5}" # Bans within window to trigger escalation
+ESCALATE_WINDOW="${ESCALATE_WINDOW:-3600}"    # Time window for escalation (1h)
+ESCALATE_PENALTY="${ESCALATE_PENALTY:-86400}" # Escalation ban duration (24h)
+BAN_TRACK_FILE="${BAN_TRACK_FILE:-/var/run/authshield.bans}" # File storing ban history
 
 # ---------- Helpers ----------
 
@@ -51,7 +49,7 @@ ensure_sets() {
 # True if $1 is a private/loopback/link-local/ULA address
 is_private_ip() {
   case "$1" in
-    10.* | 192.168.* | 172.1[6-9].* | 172.2[0-9].* | 172.3[0-1].*   | 127.* | ::1 | fe80:* | fd* | fc*)
+    10.* | 192.168.* | 172.1[6-9].* | 172.2[0-9].* | 172.3[0-1].* | 127.* | ::1 | fe80:* | fd* | fc*)
       return 0
       ;;
     *)
@@ -63,15 +61,19 @@ is_private_ip() {
 # Add IP to the nft set with timeout = PENALTY
 ban_ip() {
   local ip="$1"
+  local override_dur="$2"
+  local reason="$3"
 
   # Optionally skip private/local addresses
   if [ "$IGNORE_PRIVATE" = "1" ] && is_private_ip "$ip"; then
     return 0
   fi
 
-  # Decide penalty (escalation can be toggled off via UI)
+  # Decide penalty
   local dur
-  if [ "$ESCALATE_ENABLE" = "1" ]; then
+  if [ -n "$override_dur" ]; then
+    dur="$override_dur"
+  elif [ "$ESCALATE_ENABLE" = "1" ]; then
     dur="$(record_and_get_penalty "$ip" 2>/dev/null)" || dur="$PENALTY"
   else
     dur="$PENALTY"
@@ -85,7 +87,7 @@ ban_ip() {
   if [ "$ESCALATE_ENABLE" = "1" ] && [ "$dur" -ge "$ESCALATE_PENALTY" ]; then
     logger -t authshield "Escalated ban: $ip for ${dur}s (> ${ESCALATE_THRESHOLD} bans within ${ESCALATE_WINDOW}s)"
   else
-    logger -t authshield "Banned IP $ip for ${dur}s (threshold $THRESHOLD within ${WINDOW}s)"
+    logger -t authshield "Banned IP $ip for ${dur}s${reason:+ (reason: $reason)}"
   fi
 }
 
@@ -142,18 +144,19 @@ stream_failures() {
 #   - reads IPs (one per line) on stdin
 #   - bans IP once it has THRESHOLD events within WINDOW seconds
 monitor_and_ban() {
-  awk -v WIN="$WINDOW" -v TH="$THRESHOLD" '
+  awk -v WIN="$WINDOW" -v TH="$THRESHOLD" -v GWIN="$GLOBAL_WINDOW" -v GTH="$GLOBAL_THRESHOLD" -v GEN="$GLOBAL_ENABLE" '
     function now() { return systime() }
 
     # Append timestamp to IPs ring (T[ip_idx]) and maintain count N[ip]
     function push(ts, ip) { N[ip]++; T[ip "_" N[ip]] = ts }
 
     # Drop entries older than WIN seconds for this IP
-    function prune(ts, ip,   n, m, i, t) {
+    function prune(ts, ip,   n, m, i, t, MAXW) {
+      MAXW = (GWIN > WIN ? GWIN : WIN)
       n = N[ip]; m = 0
       for (i = 1; i <= n; i++) {
         t = T[ip "_" i]
-        if (ts - t <= WIN) { m++; T[ip "_" m] = t }
+        if (ts - t <= MAXW) { m++; T[ip "_" m] = t }
       }
       N[ip] = m
     }
@@ -167,13 +170,23 @@ monitor_and_ban() {
 
       if (N[ip] >= TH) {
         print "BAN " ip
-        N[ip] = 0   # reset after ban trigger
+        N[ip] = 0
         fflush()
+      } else if (GEN == 1) {
+        # Count within the longer window without altering the compacted buffer
+        longc = 0
+        for (i = 1; i <= N[ip]; i++) {
+          t2 = T[ip "_" i]
+          if (now() - t2 <= GWIN) longc++
+        }
+        if (longc > GTH) {
+          print "BAN24 " ip
+          fflush()
+        }
       }
     }
   '
 }
-
 
 # Record the ban for $ip, prune old records, and return the effective penalty (seconds)
 record_and_get_penalty() {
@@ -207,9 +220,16 @@ main() {
 
   # Pipeline:
   #   [ logread -f → awk (IPs) ] | [ awk sliding window ] | [ shell loop → ban_ip ]
-  stream_failures     | monitor_and_ban     | while read -r action ip; do
-        [ "$action" = "BAN" ] && ban_ip "$ip"
-      done
+  stream_failures | monitor_and_ban | while read -r action ip; do
+      case "$action" in
+        BAN)
+          ban_ip "$ip" "$PENALTY" "threshold/${THRESHOLD}@${WINDOW}s"
+          ;;
+        BAN24)
+          ban_ip "$ip" "$GLOBAL_PENALTY" "global>${GLOBAL_THRESHOLD}@${GLOBAL_WINDOW}s"
+          ;;
+      esac
+  done
 }
 
 main

@@ -12,6 +12,9 @@ s = m:section(TypedSection, "settings", translate("General Settings"))
 s.anonymous = true
 s.addremove = false
 
+
+s:tab("main", translate("General"))
+s:tab("advanced", translate("Advanced / Global"))
 -- small helpers
 local function uint_range_validator(minv, maxv, label, def)
     return function(self, value)
@@ -27,12 +30,12 @@ local function uint_range_validator(minv, maxv, label, def)
 end
 
 -- Enable / Disable
-o = s:option(Flag, "enabled", translate("Enable AuthShield"))
+o = s:taboption("main", Flag, "enabled", translate("Enable AuthShield"))
 o.default = 1
 o.rmempty = false
 
 -- Failure threshold
-o = s:option(Value, "threshold", translate("Failure Threshold"),
+o = s:taboption("main", Value, "threshold", translate("Failure Threshold"),
     translate("Number of failed attempts within the time window before an IP is banned.") ..
     " " .. translate("Allowed range:") .. " " .. translate("1–30"))
 o.placeholder = "5"
@@ -45,7 +48,7 @@ function o.write(self, section, value)
 end
 
 -- Time window (seconds)
-o = s:option(Value, "window", translate("Time Window (s)"),
+o = s:taboption("main", Value, "window", translate("Time Window (s)"),
     translate("Period in seconds during which failed attempts are counted.") ..
     " " .. translate("Allowed range:") .. " " .. translate("10–60"))
 o.placeholder = "10"
@@ -58,7 +61,7 @@ function o.write(self, section, value)
 end
 
 -- Penalty duration (seconds)
-o = s:option(Value, "penalty", translate("Ban Duration (s)"),
+o = s:taboption("main", Value, "penalty", translate("Ban Duration (s)"),
     translate("How long (in seconds) a client is banned after exceeding the threshold.") ..
     " " .. translate("Allowed range:") .. " " .. translate("60–600"))
 o.placeholder = "60"
@@ -95,18 +98,13 @@ function ports.validate(self, value, section)
     return table.concat(out, " ")
 end
 
--- Escalate frequent offenders
-o = s:option(Flag, "escalate_enable", translate("Escalate frequent offenders"),
-    translate("If an IP is banned more than 5 times within 1 hour, ban it for 24 hours."))
-o.default = 1
-
 -- Monitor Dropbear SSH
-o = s:option(Flag, "watch_dropbear", translate("Monitor Dropbear SSH"),
+o = s:taboption("main", Flag, "watch_dropbear", translate("Monitor Dropbear SSH"),
     translate("Also monitor bad password attempts on Dropbear SSH service."))
 o.default = 0
 
 -- Ignore private/local IPs
-o = s:option(Flag, "ignore_private_ip", translate("Ignore Private IPs"),
+o = s:taboption("main", Flag, "ignore_private_ip", translate("Ignore Private IPs"),
     translate("Skip banning LAN, loopback, and link-local addresses."))
 o.default = 1
 
@@ -203,11 +201,54 @@ do
     local v6 = fetch_set("authshield_penalty_v6")
     for _, x in ipairs(v6) do table.insert(v4, x) end  -- merge
 
-    local dv = s:option(DummyValue, "_current_bans", translate("Currently Banned IPs"))
+    local dv = s:taboption("main", DummyValue, "_current_bans", translate("Currently Banned IPs"))
     dv.rawhtml = true
     function dv.cfgvalue()
         return render_rows(v4)
     end
 end
+
+
+-- Escalate frequent offenders
+o = s:taboption("advanced", Flag, "escalate_enable", translate("Escalate frequent offenders"),
+    translate("When enabled, if an IP receives more than the threshold number of bans within the window, the next ban lasts the escalation penalty (24h by default). Counts bans (not failures). Private/loopback/ULA are still skipped when 'Ignore private IPs' is on."))
+o.default = 1
+
+-- Escalation tuning (frequent offenders → 24h)
+o = s:taboption("advanced", Value, "escalate_threshold", translate("Escalate Threshold"),
+    translate("Number of bans within the window that triggers escalation (the current ban is included in the check)."))
+o.placeholder = "5"; o.default = 5
+o.datatype = "range(2,10)"
+
+o = s:taboption("advanced", Value, "escalate_window", translate("Escalate Window (seconds)"),
+    translate("Rolling time window for counting bans (e.g. 3600 for 1 hour)."))
+o.placeholder = "3600"; o.default = 3600
+o.datatype = "range(1800,21600)"
+
+o = s:taboption("advanced", Value, "escalate_penalty", translate("Escalate Penalty (seconds)"),
+    translate("Ban duration applied upon escalation (e.g. 86400 for 24 hours)."))
+o.placeholder = "86400"; o.default = 86400
+o.datatype = "range(3600,604800)"
+
+-- Advanced / Global controls
+o = s:taboption("advanced", Flag, "global_enable", translate("Enable Global Rule"),
+    translate("If enabled, an IP with more than the global threshold of failed logins within the global window is banned for the global penalty (24h by default)."))
+o.default = o.default or 1
+o.rmempty = false
+
+o = s:taboption("advanced", Value, "global_threshold", translate("Global Threshold"),
+    translate("Failed logins within the global window that trigger the 24h ban (strictly greater-than this number). Example: set 60 for 'more than 60'."))
+o.placeholder = "60"; o.default = 60
+o.datatype = "range(30,300)"
+
+o = s:taboption("advanced", Value, "global_window", translate("Global Window (seconds)"),
+    translate("Rolling time window to count failed logins (e.g. 43200 for 12 hours)."))
+o.placeholder = "43200"; o.default = 43200
+o.datatype = "range(3600,172800)"
+
+o = s:taboption("advanced", Value, "global_penalty", translate("Global Penalty (seconds)"),
+    translate("Ban duration when the global threshold is exceeded (e.g. 86400 for 24 hours)."))
+o.placeholder = "86400"; o.default = 86400
+o.datatype = "range(3600,604800)"
 
 return m

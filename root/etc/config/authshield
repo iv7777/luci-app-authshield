@@ -3,11 +3,22 @@
 # Optional: watch Dropbear (SSH) and ignore private/local IPs.
 
 config settings 'main'
-        option enabled           '0'
-        option threshold         '5'
-        option window            '10'
-        option penalty           '60'
-        option ports             '80 443'
-        option escalate_enable   '1'
-        option watch_dropbear    '0'
+        option enabled '0'
+        option threshold '5'
+        option window '10'
+        option penalty '60'
+        option ports '80 443'
+        option escalate_enable '1'
+        option watch_dropbear '0'
         option ignore_private_ip '1'
+
+        # --- Advanced / Global rule ---
+        option global_enable '1'
+        option global_threshold '60'
+        option global_window '43200'
+        option global_penalty '86400'
+
+        # --- Escalation tuning ---
+        option escalate_threshold '5'
+        option escalate_window '3600'
+        option escalate_penalty '86400'
