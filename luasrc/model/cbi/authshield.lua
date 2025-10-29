@@ -232,7 +232,7 @@ o.datatype = "range(3600,604800)"
 
 -- Advanced / Global controls
 o = s:taboption("advanced", Flag, "global_enable", translate("Enable Global Rule"),
-    translate("If enabled, an IP with more than the global threshold of failed logins within the global window is banned for the global penalty (24h by default)."))
+    translate("If enabled, an IP with more than the global threshold of failed logins within the global window is banned for the global penalty (24h by default). Private/loopback/ULA are still skipped when 'Ignore private IPs' is on."))
 o.default = o.default or 1
 o.rmempty = false
 
