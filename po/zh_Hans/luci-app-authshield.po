@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: luci-app-authshield\n"
-"PO-Revision-Date: 2025-10-30 12:00+0800\n"
+"PO-Revision-Date: 2025-10-30 12:30+0800\n"
 "Last-Translator: AuthShield Translator <noreply@authshield>\n"
 "Language-Team: Simplified Chinese\n"
 "Language: zh_Hans\n"
@@ -9,9 +9,9 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-# From authshield.lua
+# From latest authshield.lua
 msgid "AuthShield"
-msgstr "AuthShield 身份防护"
+msgstr "AuthShield 登录防护"
 
 msgid "Lightweight intrusion prevention that delays or blocks repeated failed login attempts for both LuCI and Dropbear SSH."
 msgstr "轻量级入侵防护系统，用于延迟或阻止针对 LuCI 与 Dropbear SSH 的重复登录失败尝试。"
@@ -151,8 +151,8 @@ msgstr "当超过全局阈值时的封禁时长（例如 86400 表示 24 小时�
 msgid "Enable Circuit Breaker"
 msgstr "启用断路器防护"
 
-msgid "When total failed logins across all IPs exceed the threshold within the window, block management ports on WAN interface for the specified duration."
-msgstr "当所有 IP 的总失败登录次数在时间窗口内超过阈值时，阻断 WAN 接口上的管理端口访问，持续指定时长。"
+msgid "When total failed logins across all IPs exceed the threshold within the window, block management ports on WAN interface for the specified duration. Private/loopback/ULA are still skipped when 'Ignore private IPs' is on."
+msgstr "当所有 IP 的总失败登录次数在时间窗口内超过阈值时，阻断 WAN 接口上的管理端口访问，持续指定时长。启用“忽略私有 IP”时，本地/回环/ULA 地址仍被跳过。"
 
 msgid "Circuit Threshold"
 msgstr "断路器阈值"

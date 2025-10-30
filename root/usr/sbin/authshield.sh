@@ -216,12 +216,22 @@ stream_failures() {
 # Sliding-window counter with circuit breaker support:
 #   - reads IPs (one per line) on stdin
 #   - bans IP once it has THRESHOLD events within WINDOW seconds
-#   - tracks total failures for circuit breaker
+#   - tracks total failures for circuit breaker (respects IGNORE_PRIVATE setting)
 monitor_and_ban() {
   awk -v WIN="$WINDOW" -v TH="$THRESHOLD" \
       -v GWIN="$GLOBAL_WINDOW" -v GTH="$GLOBAL_THRESHOLD" -v GEN="$GLOBAL_ENABLE" \
-      -v CWIN="$CIRCUIT_WINDOW" -v CTH="$CIRCUIT_THRESHOLD" -v CEN="$CIRCUIT_ENABLE" '
+      -v CWIN="$CIRCUIT_WINDOW" -v CTH="$CIRCUIT_THRESHOLD" -v CEN="$CIRCUIT_ENABLE" \
+      -v IGNORE_PRIV="$IGNORE_PRIVATE" '
     function now() { return systime() }
+    
+    # Check if IP is private/loopback/link-local/ULA
+    function is_private(ip) {
+      if (ip ~ /^10\./ || ip ~ /^192\.168\./ || ip ~ /^172\.(1[6-9]|2[0-9]|3[0-1])\./ || \
+          ip ~ /^127\./ || ip == "::1" || ip ~ /^fe80:/ || ip ~ /^fd/ || ip ~ /^fc/) {
+        return 1
+      }
+      return 0
+    }
     
     # Short-window state (per-IP)
     function spush(ts, ip) { SWN[ip]++; SWT[ip "_" SWN[ip]] = ts }
@@ -245,7 +255,7 @@ monitor_and_ban() {
       LGN[ip] = m
     }
     
-    # Circuit breaker: total failures across all IPs
+    # Circuit breaker: total failures across all IPs (respects IGNORE_PRIV)
     function cpush(ts) { CN++; CT[CN] = ts }
     function cprune(ts,   n, m, i, t) {
       n = CN; m = 0
@@ -262,13 +272,18 @@ monitor_and_ban() {
       ip = $0
       t  = now()
       
+      # Check if IP should be ignored
+      skip_ip = (IGNORE_PRIV == "1" && is_private(ip)) ? 1 : 0
+      
       # Update per-IP counters
       sprune(t, ip); spush(t, ip)
       lprune(t, ip); lpush(t, ip)
       
-      # Update circuit breaker total counter
+      # Update circuit breaker total counter (skip private IPs if IGNORE_PRIV is enabled)
       if (CEN == 1) {
-        cpush(t)
+        if (!skip_ip) {
+          cpush(t)
+        }
         total = cprune(t)
         
         # Check if circuit threshold exceeded

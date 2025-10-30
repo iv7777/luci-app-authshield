@@ -256,7 +256,7 @@ o.datatype = "range(3600,604800)"
 -- ========== Circuit Breaker Tab ==========
 
 o = s:taboption("circuit", Flag, "circuit_enable", translate("Enable Circuit Breaker"),
-    translate("When total failed logins across all IPs exceed the threshold within the window, block management ports on WAN interface for the specified duration."))
+    translate("When total failed logins across all IPs exceed the threshold within the window, block management ports on WAN interface for the specified duration. Private/loopback/ULA are still skipped when 'Ignore private IPs' is on."))
 o.default = 1
 o.rmempty = false
 
