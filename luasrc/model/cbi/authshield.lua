@@ -76,10 +76,10 @@ function o.write(self, section, value)
 end
 
 -- Ports protected
-local ports = s:option(Value, "ports", translate("Protected Ports"))
-ports.placeholder = "80 443"
-ports.description = translate("Space-separated ports (max 10). Each must be numeric, 1–65535.")
-function ports.validate(self, value, section)
+o = s:taboption("main", Value, "ports", translate("Protected Ports"))
+o.placeholder = "80 443"
+o.description = translate("Space-separated ports (max 10). Each must be numeric, 1–65535.")
+function o.validate(self, value, section)
     if not value or value == "" then
         return value
     end
