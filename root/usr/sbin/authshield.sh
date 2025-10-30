@@ -84,11 +84,18 @@ ban_ip() {
     *)   nft add element $SET_V4_PATH "{ $ip timeout ${dur}s }" 2>/dev/null ;; # IPv4
   esac
 
-  if [ "$ESCALATE_ENABLE" = "1" ] && [ "$dur" -ge "$ESCALATE_PENALTY" ]; then
-    logger -t authshield "Escalated ban: $ip for ${dur}s (> ${ESCALATE_THRESHOLD} bans within ${ESCALATE_WINDOW}s)"
-  else
-    logger -t authshield "Banned IP $ip for ${dur}s${reason:+ (reason: $reason)}"
-  fi
+  case "$reason" in
+    "global>"*)
+      logger -t authshield "Global rule ban: $ip for ${dur}s (${reason})"
+      ;;
+    *)
+      if [ "$ESCALATE_ENABLE" = "1" ] && [ "$dur" -ge "$ESCALATE_PENALTY" ]; then
+        logger -t authshield "Escalated ban: $ip for ${dur}s (> ${ESCALATE_THRESHOLD} bans within ${ESCALATE_WINDOW}s)"
+      else
+        logger -t authshield "Banned IP $ip for ${dur}s${reason:+ (reason: $reason)}"
+      fi
+      ;;
+  esac
 }
 
 
@@ -146,40 +153,40 @@ stream_failures() {
 monitor_and_ban() {
   awk -v WIN="$WINDOW" -v TH="$THRESHOLD" -v GWIN="$GLOBAL_WINDOW" -v GTH="$GLOBAL_THRESHOLD" -v GEN="$GLOBAL_ENABLE" '
     function now() { return systime() }
-
-    # Append timestamp to IPs ring (T[ip_idx]) and maintain count N[ip]
-    function push(ts, ip) { N[ip]++; T[ip "_" N[ip]] = ts }
-
-    # Drop entries older than WIN seconds for this IP
-    function prune(ts, ip,   n, m, i, t, MAXW) {
-      MAXW = (GWIN > WIN ? GWIN : WIN)
-      n = N[ip]; m = 0
+    # Short-window state
+    function spush(ts, ip) { SWN[ip]++; SWT[ip "_" SWN[ip]] = ts }
+    function sprune(ts, ip,   n, m, i, t) {
+      n = SWN[ip]; m = 0
       for (i = 1; i <= n; i++) {
-        t = T[ip "_" i]
-        if (ts - t <= MAXW) { m++; T[ip "_" m] = t }
+        t = SWT[ip "_" i]
+        if (ts - t <= WIN) { m++; SWT[ip "_" m] = t }
       }
-      N[ip] = m
+      SWN[ip] = m
+    }
+    # Long-window state
+    function lpush(ts, ip) { LGN[ip]++; LGT[ip "_" LGN[ip]] = ts }
+    function lprune(ts, ip,   n, m, i, t) {
+      n = LGN[ip]; m = 0
+      for (i = 1; i <= n; i++) {
+        t = LGT[ip "_" i]
+        if (ts - t <= GWIN) { m++; LGT[ip "_" m] = t }
+      }
+      LGN[ip] = m
     }
 
     # Main stream processing
     {
       ip = $0
       t  = now()
-      prune(t, ip)
-      push(t, ip)
+      sprune(t, ip); spush(t, ip)
+      lprune(t, ip); lpush(t, ip)
 
-      if (N[ip] >= TH) {
+      if (SWN[ip] >= TH) {
         print "BAN " ip
-        N[ip] = 0
+        SWN[ip] = 0   # reset only short window; keep long window for global rule
         fflush()
       } else if (GEN == 1) {
-        # Count within the longer window without altering the compacted buffer
-        longc = 0
-        for (i = 1; i <= N[ip]; i++) {
-          t2 = T[ip "_" i]
-          if (now() - t2 <= GWIN) longc++
-        }
-        if (longc > GTH) {
+        if (LGN[ip] > GTH) {  # strictly greater-than (e.g., >60)
           print "BAN24 " ip
           fflush()
         }
@@ -223,9 +230,11 @@ main() {
   stream_failures | monitor_and_ban | while read -r action ip; do
       case "$action" in
         BAN)
-          ban_ip "$ip" "$PENALTY" "threshold/${THRESHOLD}@${WINDOW}s"
+          # No override so escalation can apply when enabled
+          ban_ip "$ip" "" "threshold/${THRESHOLD}@${WINDOW}s"
           ;;
         BAN24)
+          # Explicit override to always apply the global rule duration
           ban_ip "$ip" "$GLOBAL_PENALTY" "global>${GLOBAL_THRESHOLD}@${GLOBAL_WINDOW}s"
           ;;
       esac
