@@ -15,6 +15,8 @@ s.addremove = false
 
 s:tab("main", translate("General"))
 s:tab("advanced", translate("Advanced / Global"))
+s:tab("circuit", translate("Circuit Breaker"))
+
 -- small helpers
 local function uint_range_validator(minv, maxv, label, def)
     return function(self, value)
@@ -250,5 +252,76 @@ o = s:taboption("advanced", Value, "global_penalty", translate("Global Penalty (
     translate("Ban duration when the global threshold is exceeded (e.g. 86400 for 24 hours)."))
 o.placeholder = "86400"; o.default = 86400
 o.datatype = "range(3600,604800)"
+
+-- ========== Circuit Breaker Tab ==========
+
+o = s:taboption("circuit", Flag, "circuit_enable", translate("Enable Circuit Breaker"),
+    translate("When total failed logins across all IPs exceed the threshold within the window, block management ports on WAN interface for the specified duration."))
+o.default = 1
+o.rmempty = false
+
+o = s:taboption("circuit", Value, "circuit_threshold", translate("Circuit Threshold"),
+    translate("Total failed login attempts (from all IPs combined) that trigger the circuit breaker. Example: 120 total failures."))
+o.placeholder = "120"
+o.default = 120
+o.datatype = "range(50,500)"
+
+o = s:taboption("circuit", Value, "circuit_window", translate("Circuit Window (seconds)"),
+    translate("Rolling time window to count total failed logins (e.g. 43200 for 12 hours)."))
+o.placeholder = "43200"
+o.default = 43200
+o.datatype = "range(3600,172800)"
+
+o = s:taboption("circuit", Value, "circuit_penalty", translate("Circuit Block Duration (seconds)"),
+    translate("How long to block WAN access to management ports when circuit breaker triggers (e.g. 3600 for 1 hour)."))
+o.placeholder = "3600"
+o.default = 3600
+o.datatype = "range(600,14400)"
+
+o = s:taboption("circuit", Value, "circuit_unlock_threshold", translate("Auto-Unlock Threshold"),
+    translate("If total failures drop below this number within the window, automatically unlock WAN access. Set to 0 to disable auto-unlock."))
+o.placeholder = "60"
+o.default = 60
+o.datatype = "range(0,300)"
+
+-- Circuit breaker status display
+do
+    local function get_circuit_status()
+        local status_file = "/var/run/authshield.circuit"
+        local f = io.open(status_file, "r")
+        if not f then
+            return "<em>" .. translate("Circuit breaker not active") .. "</em>"
+        end
+        
+        local content = f:read("*all")
+        f:close()
+        
+        local locked, expires, count = content:match("^(%d+) (%d+) (%d+)")
+        if not locked then
+            return "<em>" .. translate("Invalid status") .. "</em>"
+        end
+        
+        locked = tonumber(locked)
+        expires = tonumber(expires)
+        count = tonumber(count)
+        local now = os.time()
+        
+        if locked == 1 and expires > now then
+            local remaining = expires - now
+            return string.format('<span style="color:red;font-weight:bold">🔒 LOCKED</span> - WAN ports blocked for %ds (Total failures: %d)', 
+                remaining, count)
+        elseif locked == 0 then
+            return string.format('<span style="color:green">✓ UNLOCKED</span> - Total failures in window: %d', count)
+        else
+            return "<em>" .. translate("Monitoring...") .. "</em>"
+        end
+    end
+    
+    local dv = s:taboption("circuit", DummyValue, "_circuit_status", translate("Circuit Breaker Status"))
+    dv.rawhtml = true
+    function dv.cfgvalue()
+        return get_circuit_status()
+    end
+end
 
 return m
