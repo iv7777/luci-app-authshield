@@ -308,10 +308,17 @@ do
         
         if locked == 1 and expires > now then
             local remaining = expires - now
-            return string.format('<span style="color:red;font-weight:bold">🔒 LOCKED</span> - WAN ports blocked for %ds (Total failures: %d)', 
-                remaining, count)
+            return string.format('<span style="color:red;font-weight:bold">🔒 %s</span> - %s %ds (%s: %d)', 
+                translate("LOCKED"),
+                translate("WAN ports blocked for"),
+                remaining,
+                translate("Total failures"),
+                count)
         elseif locked == 0 then
-            return string.format('<span style="color:green">✓ UNLOCKED</span> - Total failures in window: %d', count)
+            return string.format('<span style="color:green">✓ %s</span> - %s: %d', 
+                translate("UNLOCKED"),
+                translate("Total failures in window"),
+                count)
         else
             return "<em>" .. translate("Monitoring...") .. "</em>"
         end

@@ -9,15 +9,27 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: luci-app-authshield
+# From authshield.lua
 msgid "AuthShield"
-msgstr "AuthShield 登录防护"
+msgstr "AuthShield 身份防护"
 
 msgid "Lightweight intrusion prevention that delays or blocks repeated failed login attempts for both LuCI and Dropbear SSH."
 msgstr "轻量级入侵防护系统，用于延迟或阻止针对 LuCI 与 Dropbear SSH 的重复登录失败尝试。"
 
 msgid "General Settings"
 msgstr "常规设置"
+
+msgid "General"
+msgstr "常规"
+
+msgid "Advanced / Global"
+msgstr "高级 / 全局"
+
+msgid "Circuit Breaker"
+msgstr "断路器防护"
+
+msgid "%s must be %d–%d."
+msgstr "%s 必须在 %d–%d 之间。"
 
 msgid "Enable AuthShield"
 msgstr "启用 AuthShield"
@@ -28,11 +40,20 @@ msgstr "失败阈值"
 msgid "Number of failed attempts within the time window before an IP is banned."
 msgstr "在设定时间窗口内，触发封禁前允许的最大失败尝试次数。"
 
+msgid "Allowed range:"
+msgstr "允许范围："
+
+msgid "1–30"
+msgstr "1–30"
+
 msgid "Time Window (s)"
 msgstr "时间窗口（秒）"
 
 msgid "Period in seconds during which failed attempts are counted."
 msgstr "统计失败登录次数的时间周期（以秒为单位）。"
+
+msgid "10–60"
+msgstr "10–60"
 
 msgid "Ban Duration (s)"
 msgstr "封禁时长（秒）"
@@ -40,11 +61,20 @@ msgstr "封禁时长（秒）"
 msgid "How long (in seconds) a client is banned after exceeding the threshold."
 msgstr "当失败次数超过阈值后，客户端将被封禁的时长（秒）。"
 
+msgid "60–600"
+msgstr "60–600"
+
 msgid "Protected Ports"
 msgstr "受保护端口"
 
 msgid "Space-separated ports (max 10). Each must be numeric, 1–65535."
 msgstr "以空格分隔的端口号（最多 10 个），每个必须为 1–65535 之间的数字。"
+
+msgid "Invalid port number: %s (must be between 1 and 65535)"
+msgstr "无效的端口号：%s（必须在 1–65535 之间）"
+
+msgid "You can specify at most 10 ports."
+msgstr "最多可指定 10 个端口。"
 
 msgid "Monitor Dropbear SSH"
 msgstr "监控 Dropbear SSH"
@@ -63,6 +93,12 @@ msgstr "当前被封禁的 IP"
 
 msgid "None"
 msgstr "无"
+
+msgid "IP"
+msgstr "IP"
+
+msgid "Expires"
+msgstr "到期"
 
 msgid "Escalate frequent offenders"
 msgstr "升级处罚频繁违规者"
@@ -160,29 +196,11 @@ msgstr "已锁定"
 msgid "UNLOCKED"
 msgstr "已解锁"
 
-msgid "WAN ports blocked for %ds (Total failures: %d)"
-msgstr "WAN 管理端口已阻断 %d 秒（总失败次数：%d）"
+msgid "WAN ports blocked for"
+msgstr "WAN 管理端口已阻断"
 
-msgid "Total failures in window: %d"
-msgstr "当前时间窗口内的总失败次数：%d"
+msgid "Total failures"
+msgstr "总失败次数"
 
-msgid "Main"
-msgstr "主设置"
-
-msgid "Advanced / Global"
-msgstr "高级 / 全局"
-
-msgid "Circuit Breaker"
-msgstr "断路器防护"
-
-msgid "Enable"
-msgstr "启用"
-
-msgid "Disable"
-msgstr "禁用"
-
-msgid "Save & Apply"
-msgstr "保存并应用"
-
-msgid "Revert"
-msgstr "还原"
+msgid "Total failures in window"
+msgstr "时间窗口内的总失败次数"
