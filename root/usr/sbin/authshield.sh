@@ -111,6 +111,7 @@ ban_ip() {
 
 # Circuit breaker: populate port set with timeout (auto-expires)
 circuit_lock() {
+  local total_count="${1:-0}"  # Accept count as parameter
   local chain="input_wan"
   
   # Check if chain exists
@@ -129,7 +130,7 @@ circuit_lock() {
   done
   
   local expires=$(($(date +%s) + CIRCUIT_PENALTY))
-  echo "1 $expires 0" > "$CIRCUIT_STATUS_FILE"
+  echo "1 $expires $total_count" > "$CIRCUIT_STATUS_FILE"
   
   logger -t authshield "🔒 CIRCUIT BREAKER ACTIVATED: WAN ports {$PORTS} blocked for ${CIRCUIT_PENALTY}s (auto-expires)"
 }
@@ -367,7 +368,7 @@ main() {
               read locked _ _ < "$CIRCUIT_STATUS_FILE"
             fi
             if [ "$locked" != "1" ]; then
-              circuit_lock
+              circuit_lock "$value"  # Pass the failure count
             fi
           fi
           ;;
