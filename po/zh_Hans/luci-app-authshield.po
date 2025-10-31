@@ -38,7 +38,7 @@ msgid "Failure Threshold"
 msgstr "失败阈值"
 
 msgid "Number of failed attempts within the time window before an IP is banned."
-msgstr "在设定时间窗口内，触发封禁前允许的最大失败尝试次数。"
+msgstr "在设定的时间窗口内，IP 在被封禁前允许的最大失败尝试次数。"
 
 msgid "Allowed range:"
 msgstr "允许范围："
