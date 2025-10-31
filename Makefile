@@ -5,7 +5,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-authshield
-PKG_VERSION:=1.15
+PKG_VERSION:=1.16
 PKG_RELEASE:=20251030
 PKG_MAINTAINER:=iv7777 <hongba@rocketmail.com>
 PKG_LICENSE:=MIT
