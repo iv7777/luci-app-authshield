@@ -37,6 +37,10 @@ config settings
 	# Circuit breaker settings (blocks WAN access during mass attacks)
 	option circuit_enable '1'
 	option circuit_threshold '120'         # Total failures across all IPs to trigger lockdown
-	option circuit_window '43200'          # Circuit window (12 hours)
-	option circuit_penalty '3600'          # WAN block duration (1 hour)
-	option circuit_unlock_threshold '60'   # Auto-unlock when failures drop below this
+	option circuit_window '43200'          # Circuit window (12 hours) - also acts as "memory"
+	option circuit_penalty '3600'          # WAN block duration (1 hour) - unlocks automatically via nftables timeout
+	
+	# Note: Circuit breaker automatically unlocks after circuit_penalty seconds.
+	# The circuit_window acts as a "memory" - if attackers resume attempts after unlock,
+	# and total failures still exceed circuit_threshold, the circuit will immediately re-lock.
+	# This provides extended protection without requiring manual intervention.

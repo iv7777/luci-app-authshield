@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: luci-app-authshield\n"
-"PO-Revision-Date: 2025-10-30 12:30+0800\n"
+"PO-Revision-Date: 2025-11-08 12:30+0800\n"
 "Last-Translator: AuthShield Translator <noreply@authshield>\n"
 "Language-Team: Simplified Chinese\n"
 "Language: zh_Hans\n"
@@ -169,14 +169,8 @@ msgstr "统计总失败登录次数的滚动时间窗口（例如 43200 表示 1
 msgid "Circuit Block Duration (seconds)"
 msgstr "断路器阻断时长（秒）"
 
-msgid "How long to block WAN access to management ports when circuit breaker triggers (e.g. 3600 for 1 hour)."
-msgstr "当断路器触发时，阻断 WAN 管理端口访问的持续时间（例如 3600 表示 1 小时）。"
-
-msgid "Auto-Unlock Threshold"
-msgstr "自动解锁阈值"
-
-msgid "If total failures drop below this number within the window, automatically unlock WAN access. Set to 0 to disable auto-unlock."
-msgstr "若总失败次数在时间窗口内低于此数值，则自动解锁 WAN 访问。设置为 0 表示禁用自动解锁。"
+msgid "How long to block WAN access to management ports when circuit breaker triggers. WAN access automatically restores after this duration via nftables timeout. Note: The failure counter has a 12-hour memory by default, so repeated login attempts after unlock may cause immediate re-locking until the memory window expires."
+msgstr "当断路器触发时，阻断 WAN 管理端口访问的持续时间。超过此时长后，通过 nftables 超时机制自动恢复 WAN 访问。注意：失败计数器默认具有 12 小时记忆，因此解锁后如果有重复登录尝试，可能会立即重新锁定，直到记忆窗口过期。"
 
 msgid "Circuit Breaker Status"
 msgstr "断路器状态"

@@ -211,7 +211,7 @@ del_circuit_rule() {
 
 start_service() {
     local enabled threshold window penalty ports watch_dropbear ignore_private escalate_enable
-    local circuit_enable circuit_threshold circuit_window circuit_penalty circuit_unlock_threshold
+    local circuit_enable circuit_threshold circuit_window circuit_penalty
 
     # Only when enabled do we continue
     enabled="$(get_uciv authshield.@settings[0].enabled)"; [ -n "$enabled" ] || enabled=1
@@ -241,7 +241,6 @@ start_service() {
     circuit_threshold="$(get_uciv authshield.@settings[0].circuit_threshold)"; [ -n "$circuit_threshold" ] || circuit_threshold=120
     circuit_window="$(get_uciv authshield.@settings[0].circuit_window)"; [ -n "$circuit_window" ] || circuit_window=43200
     circuit_penalty="$(get_uciv authshield.@settings[0].circuit_penalty)"; [ -n "$circuit_penalty" ] || circuit_penalty=3600
-    circuit_unlock_threshold="$(get_uciv authshield.@settings[0].circuit_unlock_threshold)"; [ -n "$circuit_unlock_threshold" ] || circuit_unlock_threshold=60
 
     [ "$enabled" -eq 1 ] || return 0
 
@@ -269,7 +268,6 @@ start_service() {
                         CIRCUIT_THRESHOLD="$circuit_threshold" \
                         CIRCUIT_WINDOW="$circuit_window" \
                         CIRCUIT_PENALTY="$circuit_penalty" \
-                        CIRCUIT_UNLOCK_THRESHOLD="$circuit_unlock_threshold" \
                         CIRCUIT_STATUS_FILE="$CIRCUIT_STATUS_FILE" \
                         SET_V4="$SET_V4" \
                         SET_V6="$SET_V6"

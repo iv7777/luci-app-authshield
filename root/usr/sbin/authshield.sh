@@ -9,6 +9,7 @@
 #   - IPv4 & IPv6 supported via separate nft sets.
 #   - Private IPs (RFC1918/loopback/link-local/ULA) can be ignored.
 #   - Circuit breaker blocks WAN access when total failures exceed threshold.
+#   - Circuit breaker unlocks automatically via nftables timeout (no early unlock).
 #
 
 # ---------- Defaults ----------
@@ -44,7 +45,6 @@ CIRCUIT_ENABLE="${CIRCUIT_ENABLE:-1}"             # Enable circuit breaker (1 = 
 CIRCUIT_THRESHOLD="${CIRCUIT_THRESHOLD:-120}"     # Total failures to trigger lockdown
 CIRCUIT_WINDOW="${CIRCUIT_WINDOW:-43200}"         # Time window for circuit breaker (12h)
 CIRCUIT_PENALTY="${CIRCUIT_PENALTY:-3600}"        # WAN block duration (1h)
-CIRCUIT_UNLOCK_THRESHOLD="${CIRCUIT_UNLOCK_THRESHOLD:-60}" # Auto-unlock threshold
 CIRCUIT_STATUS_FILE="${CIRCUIT_STATUS_FILE:-/var/run/authshield.circuit}" # Circuit state
 SET_CIRCUIT="authshield_circuit_ports"            # Port set for circuit breaker
 PORTS="${PORTS:-80,443}"                          # Management ports from init
@@ -133,37 +133,6 @@ circuit_lock() {
   echo "1 $expires $total_count" > "$CIRCUIT_STATUS_FILE"
   
   logger -t authshield "🔒 CIRCUIT BREAKER ACTIVATED: WAN ports {$PORTS} blocked for ${CIRCUIT_PENALTY}s (auto-expires)"
-}
-
-# Circuit breaker: clear port set to unlock immediately
-circuit_unlock() {
-  # Flush the circuit breaker port set
-  nft flush set inet fw4 "$SET_CIRCUIT" 2>/dev/null || true
-  
-  # Update status file (0 = unlocked)
-  local now=$(date +%s)
-  local count="${1:-0}"
-  echo "0 $now $count" > "$CIRCUIT_STATUS_FILE"
-  
-  logger -t authshield "✓ Circuit breaker unlocked (current failures: $count)"
-}
-
-# Check if circuit should auto-unlock based on current failure count
-circuit_check_unlock() {
-  local total_count="$1"
-  
-  # Only check if unlock threshold is set
-  [ "$CIRCUIT_UNLOCK_THRESHOLD" -gt 0 ] || return 0
-  
-  # Read current status
-  [ -f "$CIRCUIT_STATUS_FILE" ] || return 0
-  local locked expires count
-  read locked expires count < "$CIRCUIT_STATUS_FILE"
-  
-  # If locked and failures dropped below threshold, unlock
-  if [ "$locked" = "1" ] && [ "$total_count" -le "$CIRCUIT_UNLOCK_THRESHOLD" ]; then
-    circuit_unlock "$total_count"
-  fi
 }
 
 # Stream failed login events from syslog and print only the offending IPs (one per line)
@@ -291,10 +260,6 @@ monitor_and_ban() {
         if (total > CTH) {
           print "CIRCUIT_LOCK " total
           fflush()
-        } else {
-          # Check for auto-unlock
-          print "CIRCUIT_CHECK " total
-          fflush()
         }
       }
 
@@ -370,11 +335,6 @@ main() {
             if [ "$locked" != "1" ]; then
               circuit_lock "$value"  # Pass the failure count
             fi
-          fi
-          ;;
-        CIRCUIT_CHECK)
-          if [ "$CIRCUIT_ENABLE" = "1" ]; then
-            circuit_check_unlock "$value"
           fi
           ;;
       esac

@@ -273,16 +273,10 @@ o.default = 43200
 o.datatype = "range(3600,172800)"
 
 o = s:taboption("circuit", Value, "circuit_penalty", translate("Circuit Block Duration (seconds)"),
-    translate("How long to block WAN access to management ports when circuit breaker triggers (e.g. 3600 for 1 hour)."))
+    translate("How long to block WAN access to management ports when circuit breaker triggers. WAN access automatically restores after this duration via nftables timeout. Note: The failure counter has a 12-hour memory by default, so repeated login attempts after unlock may cause immediate re-locking until the memory window expires."))
 o.placeholder = "3600"
 o.default = 3600
 o.datatype = "range(600,14400)"
-
-o = s:taboption("circuit", Value, "circuit_unlock_threshold", translate("Auto-Unlock Threshold"),
-    translate("If total failures drop below this number within the window, automatically unlock WAN access. Set to 0 to disable auto-unlock."))
-o.placeholder = "60"
-o.default = 60
-o.datatype = "range(0,300)"
 
 -- Circuit breaker status display
 do
